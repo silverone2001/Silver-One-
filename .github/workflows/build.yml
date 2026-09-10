@@ -11,30 +11,40 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Extract Silver One project
+      - name: Find Silver One ZIP
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+          ZIP_FILE=$(find . -maxdepth 2 -type f -iname "*.zip" | head -n 1)
+
           if [ -z "$ZIP_FILE" ]; then
             echo "ERROR: Silver One ZIP file not found"
             exit 1
           fi
 
+          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
+          echo "Found ZIP: $ZIP_FILE"
+
+      - name: Extract Silver One project
+        run: |
+          rm -rf silverone
           mkdir -p silverone
           unzip -q "$ZIP_FILE" -d silverone
 
-          PUBSPEC=$(find silverone -name pubspec.yaml | head -n 1)
+          PUBSPEC=$(find silverone -name "pubspec.yaml" -type f | head -n 1)
+
           if [ -z "$PUBSPEC" ]; then
-            echo "ERROR: Flutter project not found"
+            echo "ERROR: Flutter pubspec.yaml not found"
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$PUBSPEC")
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Flutter project found at: $PROJECT_DIR"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.38.10"
+          flutter-version: "3.47.3"
           channel: stable
 
       - name: Get dependencies
