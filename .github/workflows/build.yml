@@ -11,40 +11,11 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Find Silver One ZIP
-        shell: bash
-        run: |
-          set -e
-
-          ZIP_FILE=$(find . -maxdepth 3 -type f -iname "*.zip" | head -n 1)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No ZIP file found."
-            exit 1
-          fi
-
-          echo "Found ZIP: $ZIP_FILE"
-
-          mkdir -p project
-          unzip -q "$ZIP_FILE" -d project
-
-          PUBSPEC=$(find project -type f -name "pubspec.yaml" | head -n 1)
-
-          if [ -z "$PUBSPEC" ]; then
-            echo "ERROR: pubspec.yaml not found."
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$PUBSPEC")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Flutter project: $PROJECT_DIR"
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.47.3"
           channel: stable
+          flutter-version: 3.47.2
           cache: true
 
       - name: Check Flutter and Dart
@@ -53,16 +24,13 @@ jobs:
           dart --version
 
       - name: Get dependencies
-        working-directory: ${{ env.PROJECT_DIR }}
         run: flutter pub get
 
       - name: Build APK
-        working-directory: ${{ env.PROJECT_DIR }}
         run: flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Silver-One-APK
-          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
+          name: silver-one-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
