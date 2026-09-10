@@ -11,26 +11,28 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
+      - name: Unzip Flutter project
+        run: |
+          unzip -o SilverOne_Native_Real.zip -d silver_one
+          find silver_one -maxdepth 2 -type f | head -30
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.47.3
+          flutter-version: 3.35.7
           cache: true
 
-      - name: Check Flutter and Dart
-        run: |
-          flutter --version
-          dart --version
-
       - name: Get dependencies
+        working-directory: silver_one
         run: flutter pub get
 
       - name: Build APK
+        working-directory: silver_one
         run: flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: silver-one-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: silver_one/build/app/outputs/flutter-apk/app-release.apk
