@@ -2,6 +2,9 @@ name: Build Silver One APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -12,33 +15,53 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Flutter
-  uses: subosito/flutter-action@v2
-  with:
-    channel: stable
-    flutter-version: 3.38.1
-    cache: false
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.38.1
+          cache: false
 
-      - name: Unzip project
+      - name: Check Flutter version
         run: |
-          unzip -o SilverOne_Native_Real.zip -d silver_one
-          echo "Searching for Flutter project..."
-          find silver_one -name pubspec.yaml -print
+          flutter --version
+          dart --version
+
+      - name: Find and extract project
+        run: |
+          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: ZIP file not found"
+            exit 1
+          fi
+
+          echo "ZIP found: $ZIP_FILE"
+          mkdir -p extracted
+          unzip -o "$ZIP_FILE" -d extracted
+
+      - name: Find Flutter project
+        run: |
+          PROJECT_DIR=$(find extracted -name pubspec.yaml -print -quit | xargs dirname)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: pubspec.yaml not found"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Flutter project found at: $PROJECT_DIR"
 
       - name: Get dependencies
         run: |
-          PROJECT_DIR=$(dirname "$(find silver_one -name pubspec.yaml -print -quit)")
-          echo "Project found at: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           flutter pub get
 
       - name: Build APK
         run: |
-          PROJECT_DIR=$(dirname "$(find silver_one -name pubspec.yaml -print -quit)")
           cd "$PROJECT_DIR"
           flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: silver-one-apk
-          path: "**/build/app/outputs/flutter-apk/app-release.apk"
+          name: Silver-One-APK
+          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
