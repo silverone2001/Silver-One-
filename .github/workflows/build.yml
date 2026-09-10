@@ -12,40 +12,45 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Find Silver One ZIP
+        shell: bash
         run: |
-          ZIP_FILE=$(find . -maxdepth 2 -type f -iname "*.zip" | head -n 1)
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 3 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Silver One ZIP file not found"
+            echo "ERROR: No ZIP file found."
             exit 1
           fi
 
-          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
           echo "Found ZIP: $ZIP_FILE"
 
-      - name: Extract Silver One project
-        run: |
-          rm -rf silverone
-          mkdir -p silverone
-          unzip -q "$ZIP_FILE" -d silverone
+          mkdir -p project
+          unzip -q "$ZIP_FILE" -d project
 
-          PUBSPEC=$(find silverone -name "pubspec.yaml" -type f | head -n 1)
+          PUBSPEC=$(find project -type f -name "pubspec.yaml" | head -n 1)
 
           if [ -z "$PUBSPEC" ]; then
-            echo "ERROR: Flutter pubspec.yaml not found"
+            echo "ERROR: pubspec.yaml not found."
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$PUBSPEC")
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Flutter project found at: $PROJECT_DIR"
+
+          echo "Flutter project: $PROJECT_DIR"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.47.3"
           channel: stable
+          cache: true
+
+      - name: Check Flutter and Dart
+        run: |
+          flutter --version
+          dart --version
 
       - name: Get dependencies
         working-directory: ${{ env.PROJECT_DIR }}
@@ -60,3 +65,4 @@ jobs:
         with:
           name: Silver-One-APK
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
