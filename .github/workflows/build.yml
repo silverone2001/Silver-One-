@@ -27,17 +27,65 @@ jobs:
           flutter-version: '3.38.1'
           cache: false
 
-      - name: Find Flutter project
+      - name: Find or extract Flutter project
+        shell: bash
         run: |
-          PROJECT_DIR=$(find . -name pubspec.yaml -not -path './.git/*' -print -quit | xargs dirname)
-          if [ -z "$PROJECT_DIR" ] || [ "$PROJECT_DIR" = "." ]; then
-            echo "ERROR: Flutter project not found"
+          set -e
+
+          echo "Searching for Flutter project..."
+
+          PROJECT_DIR=""
+
+          # First search directly
+          while IFS= read -r file; do
+            if [ -n "$file" ]; then
+              PROJECT_DIR="$(dirname "$file")"
+              break
+            fi
+          done < <(find . -name pubspec.yaml -not -path './.git/*' -print)
+
+          # If not found, search ZIP files and extract them
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Flutter project not found directly."
+            echo "Searching for ZIP..."
+
+            ZIP_FILE=""
+
+            while IFS= read -r file; do
+              if [ -n "$file" ]; then
+                ZIP_FILE="$file"
+                break
+              fi
+            done < <(find . -maxdepth 3 -type f -iname "*.zip" -not -path './.git/*' -print)
+
+            if [ -z "$ZIP_FILE" ]; then
+              echo "ERROR: No Flutter project or ZIP file found."
+              exit 1
+            fi
+
+            echo "ZIP found: $ZIP_FILE"
+
+            mkdir -p extracted
+            unzip -o "$ZIP_FILE" -d extracted
+
+            while IFS= read -r file; do
+              if [ -n "$file" ]; then
+                PROJECT_DIR="$(dirname "$file")"
+                break
+              fi
+            done < <(find extracted -name pubspec.yaml -not -path '*/.git/*' -print)
+          fi
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: pubspec.yaml not found."
             exit 1
           fi
+
+          echo "Flutter project found at: $PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Flutter project: $PROJECT_DIR"
 
       - name: Fix Kotlin Gradle jvmTarget
+        shell: bash
         run: |
           python3 - <<'PY'
           import os
@@ -58,9 +106,8 @@ jobs:
 
                       original = text
 
-                      # Remove the incompatible Kotlin jvmTarget assignment
                       text = re.sub(
-                          r'(?m)^[ \t]*jvmTarget[ \t]*=[ \t]*\r?\n?[ \t]*org\.jetbrains\.kotlin\.gradle\.dsl\.JvmTarget\.JVM_17[ \t]*\r?\n?',
+                          r'(?m)^[ \t]*jvmTarget[ \t]*=[ \t]*org\.jetbrains\.kotlin\.gradle\.dsl\.JvmTarget\.JVM_17[ \t]*$',
                           '',
                           text
                       )
@@ -75,12 +122,14 @@ jobs:
           PY
 
       - name: Get dependencies
+        shell: bash
         run: |
           cd "$PROJECT_DIR"
           flutter clean
           flutter pub get
 
       - name: Build APK
+        shell: bash
         run: |
           cd "$PROJECT_DIR"
           flutter build apk --release
