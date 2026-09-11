@@ -1,0 +1,62 @@
+name: Build Silver One APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract final Silver One project
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ZIP="SilverOne_FINAL_APK_PROJECT.zip"
+          test -f "$ZIP"
+          rm -rf app_src
+          mkdir app_src
+          unzip -q "$ZIP" -d app_src
+          test -f app_src/pubspec.yaml
+          test -f app_src/lib/main.dart
+          test -f app_src/android/app/build.gradle
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter 3.38.1
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.1'
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        working-directory: app_src
+        run: flutter pub get
+
+      - name: Setup Gradle 8.14
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14'
+
+      - name: Create Gradle wrapper
+        working-directory: app_src/android
+        run: gradle wrapper --gradle-version 8.14 --distribution-type bin
+
+      - name: Build real release APK
+        working-directory: app_src
+        run: flutter build apk --release
+
+      - name: Upload real APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Silver-One-APK
+          path: app_src/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
